@@ -3,6 +3,7 @@ from flasgger import Swagger
 import sqlite3
 import jwt  # vulnerable version
 import pickle
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SWAGGER'] = {
@@ -55,6 +56,23 @@ def login():
     else:
         return jsonify({"msg": "Invalid credentials"}), 401
 
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if token:
+            token = token.replace("Bearer ", "")
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 401
+        try:
+            # ⚠️ Signature verification is done, but with weak secret
+            data = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            request.user = data["user"]
+        except JWTError:
+            return jsonify({"message": "Invalid or expired token!"}), 401
+        return f(*args, **kwargs)
+    return decorated
+
 @app.route('/xss', methods=['GET'])
 def xss():
     """
@@ -91,6 +109,21 @@ def generate_jwt():
     return jsonify(token=token)
 
 # ---------- Hidden / Undocumented Endpoints ----------
+
+@app.route('/api/secret', methods=['GET'])
+@token_required
+def secret_area():
+    """
+    Protected secret endpoint.
+    ---
+    tags:
+      - secret
+    responses:
+      200:
+        description: Secret data
+    """
+    return jsonify({"message": f"Welcome {request.user}, here is your secret data!"})
+
 
 @app.route('/pickle', methods=['POST'])
 def insecure_pickle():
