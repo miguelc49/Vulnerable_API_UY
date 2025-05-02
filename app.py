@@ -137,6 +137,68 @@ def insecure_pickle():
 @app.route('/secret-info', methods=['GET'])
 def secret_info():
     return jsonify({"flag": "FLAG{you_found_a_hidden_endpoint}"})
+# Global insecure in-memory PII store (simulated)
+insecure_pii_store = []
+
+@app.route('/pii/submit', methods=['POST'])
+def submit_pii():
+    """
+    Insecure endpoint that accepts and stores personally identifiable information (PII).
+    ---
+    tags:
+      - pii
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              full_name:
+                type: string
+              email:
+                type: string
+              ssn:
+                type: string
+              phone_number:
+                type: string
+              address:
+                type: string
+            required: [full_name, email, ssn]
+    responses:
+      200:
+        description: PII processed (insecurely)
+        content:
+          application/json:
+            example:
+              message: "PII submitted and logged (insecurely)"
+    """
+    data = request.json
+
+    # Extracting PII fields explicitly
+    full_name = data.get("full_name")
+    email = data.get("email")
+    ssn = data.get("ssn")
+    phone_number = data.get("phone_number")
+    address = data.get("address")
+
+    # ❌ Insecure: Logging PII to stdout
+    print(f"[INSECURE LOG] Received PII Data:\n"
+          f"  Name: {full_name}\n"
+          f"  Email: {email}\n"
+          f"  SSN: {ssn}\n"
+          f"  Phone: {phone_number}\n"
+          f"  Address: {address}")
+
+    # ❌ Insecure: Storing PII in global memory
+    insecure_pii_store.append({
+        "full_name": full_name,
+        "email": email,
+        "ssn": ssn,
+        "phone_number": phone_number,
+        "address": address
+    })
+    return jsonify({"message": "PII submitted and logged (insecurely)"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
