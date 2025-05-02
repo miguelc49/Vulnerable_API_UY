@@ -200,5 +200,74 @@ def submit_pii():
     })
     return jsonify({"message": "PII submitted and logged (insecurely)"}), 200
 
+def get_instance_metadata(path):
+    try:
+        url = f"http://169.254.169.254/latest/meta-data/{path}"
+        response = requests.get(url, timeout=2)
+        return response.text
+    except:
+        return None
+
+def get_cloud_metadata():
+    try:
+        region = get_instance_metadata("placement/region") or "us-east-1"
+        ec2 = boto3.resource("ec2", region_name=region)
+
+        instance_id = get_instance_metadata("instance-id")
+        instance_type = get_instance_metadata("instance-type")
+        ami_id = get_instance_metadata("ami-id")
+        az = get_instance_metadata("placement/availability-zone")
+
+        running_instances = list(ec2.instances.filter(
+            Filters=[{"Name": "instance-state-name", "Values": ["running"]}]
+        ))
+
+        return {
+            "cloud_provider": "AWS",
+            "instance_id": instance_id,
+            "instance_type": instance_type,
+            "ami_id": ami_id,
+            "availability_zone": az,
+            "region": region,
+            "running_instance_count": len(running_instances),
+            "usage_score": 90
+        }
+
+    except Exception as e:
+        # Fallback when not in AWS
+        return {
+            "cloud_provider": "AWS",
+            "region": "us-east-1",
+            "instance_id": "local-testing",
+            "instance_type": "t2.micro",
+            "availability_zone": "us-east-1a",
+            "usage_score": 20,
+            "note": "Fallback mock data. Likely running outside AWS."
+        }
+
+@app.route('/info', methods=['GET'])
+def cloud_info():
+    """
+    Returns dynamic cloud metadata for scoring.
+    ---
+    tags:
+      - metadata
+    responses:
+      200:
+        description: AWS cloud metadata
+        content:
+          application/json:
+            example:
+              cloud_provider: "AWS"
+              instance_id: "i-0abc1234"
+              instance_type: "t2.micro"
+              ami_id: "ami-0abcdef"
+              region: "us-east-1"
+              availability_zone: "us-east-1a"
+              running_instance_count: 3
+              usage_score: 90
+    """
+    return jsonify(get_cloud_metadata())
+
 if __name__ == '__main__':
     app.run(debug=True)
