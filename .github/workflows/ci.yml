@@ -1,0 +1,52 @@
+name: Vulnerable CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: AKIAFAKEHARDcodedKEY123       # ⚠️ Hardcoded secret
+      AWS_SECRET_ACCESS_KEY: FAKEsuperSECREThardcoded  # ⚠️ Hardcoded secret
+      TF_VAR_aws_region: us-east-1
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Lint (intentional skip of security linters)
+      run: |
+        echo "Lint skipped intentionally."
+
+    - name: Run Unit Tests
+      run: |
+        python -m unittest || true  # ⚠️ Failing tests won't fail build
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: terraform
+
+    - name: Terraform Plan
+      run: terraform plan -out=tfplan
+      working-directory: terraform
+
+    - name: Terraform Apply (auto-approve)
+      run: terraform apply -auto-approve tfplan
+      working-directory: terraform
